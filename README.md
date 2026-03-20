@@ -5,6 +5,7 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Python](https://img.shields.io/badge/Python-3.x-blue.svg)](https://python.org)
 [![Pardus](https://img.shields.io/badge/Pardus-23%2B-red.svg)](https://pardus.org.tr)
+[![Release](https://img.shields.io/badge/Release-v1.0.0-green.svg)](https://github.com/yigitatmaca42/PowerConnect/releases/latest)
 
 PowerConnect, öğretmenin ekranını öğrenci bilgisayarlarına gerçek zamanlı olarak yayınlamasını, dosya göndermesini ve öğrenci dosya sistemine erişmesini sağlayan hafif ve kurulumu kolay bir uygulamadır. Tamamen Pardus Linux üzerinde geliştirilmiş olup yerli ve milli ekosisteme katkı sağlamayı hedeflemektedir.
 
@@ -16,7 +17,7 @@ PowerConnect, öğretmenin ekranını öğrenci bilgisayarlarına gerçek zamanl
 
 ```bash
 # 1. Paketi indir
-wget https://raw.githubusercontent.com/yigitatmaca42/PowerConnect/main/releases/powerconnect_1.0.0_amd64.deb
+wget https://github.com/yigitatmaca42/PowerConnect/releases/download/v1.0.0/powerconnect_1.0.0_amd64.deb
 
 # 2. Kur
 sudo dpkg -i powerconnect_1.0.0_amd64.deb
@@ -28,13 +29,11 @@ Kurulum tamamlandıktan sonra uygulamayı başlatmak için:
 PowerConnect
 ```
 
-Tüm sürümler için → [releases/](releases/)
-
 ### Öğrenci PC'ler
 
 ```bash
 # 1. Paketi indir
-wget https://raw.githubusercontent.com/yigitatmaca42/PowerConnect/main/releases/powerconnect-client_1.0.0_amd64.deb
+wget https://github.com/yigitatmaca42/PowerConnect/releases/download/v1.0.0/powerconnect-client_1.0.0_amd64.deb
 
 # 2. Kur
 sudo dpkg -i powerconnect-client_1.0.0_amd64.deb
@@ -43,6 +42,8 @@ sudo dpkg -i powerconnect-client_1.0.0_amd64.deb
 Kurulum tamamlandıktan sonra servis otomatik olarak başlar. Bilgisayar her açıldığında arka planda çalışır, başka bir işlem gerekmez.
 
 > Öğrenci servisi `/opt/powerconnect/user` konumuna kurulur ve kilitlenir. `rm -rf` ile bile silinemez, yalnızca format atılarak kaldırılabilir.
+
+Tüm sürümler için → [Releases](https://github.com/yigitatmaca42/PowerConnect/releases)
 
 ---
 
