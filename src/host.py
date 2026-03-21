@@ -20,6 +20,8 @@ GEZGIN_PORT    = 5556
 
 baglantilar      = {}
 baglantilar_lock = threading.Lock()
+son_gorunme      = {}   # ip -> timestamp
+son_gorunme_lock = threading.Lock()
 
 def kendi_ip():
     try:
@@ -42,9 +44,33 @@ def broadcast_dinle(pencere):
             ad = bilgi.get("ad", "").strip()
             ip = bilgi.get("ip", "").strip()
             if ad and ip and ip != kendi_ip():
+                with son_gorunme_lock:
+                    son_gorunme[ip] = time.time()
                 GLib.idle_add(pencere.pc_guncelle, ad, ip)
         except:
             pass
+
+def kopuk_kontrol(pencere):
+    """Her 3 saniyede bir kopuk PC leri listeden kaldir."""
+    while True:
+        time.sleep(3)
+        simdi = time.time()
+        with son_gorunme_lock:
+            kopuklar = [ip for ip, t in son_gorunme.items() if simdi - t > 5]
+        for ip in kopuklar:
+            with son_gorunme_lock:
+                son_gorunme.pop(ip, None)
+            # Baglantiyida kes
+            with baglantilar_lock:
+                bilgi = baglantilar.get(ip)
+                if bilgi:
+                    bilgi['aktif'] = False
+                    try:
+                        bilgi['conn'].close()
+                    except:
+                        pass
+                    del baglantilar[ip]
+            GLib.idle_add(pencere.pc_kaldir, ip)
 
 def _tam_al(conn, n):
     veri = b''
@@ -578,6 +604,16 @@ class HostPencere(Gtk.Window):
         if ip in self.kartlar:
             self.kartlar[ip].set_kesildi()
 
+    def pc_kaldir(self, ip):
+        if ip in self.kartlar:
+            kart = self.kartlar[ip]
+            child = kart.get_parent()
+            if child:
+                self.flow.remove(child)
+            del self.kartlar[ip]
+            self.pc_listesi.pop(ip, None)
+            self._sayac_guncelle()
+
     def pc_hata(self, ip, mesaj):
         if ip in self.kartlar:
             self.kartlar[ip].set_hata(mesaj)
@@ -631,21 +667,20 @@ class HostPencere(Gtk.Window):
             Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
             "Gonder", Gtk.ResponseType.OK
         )
-        # Hem dosya hem klasor secimi
-        dialog.set_action(Gtk.FileChooserAction.OPEN)
-        dialog.set_select_multiple(False)
         yanit = dialog.run()
         if yanit == Gtk.ResponseType.OK:
             dosya_yolu = dialog.get_filename()
-            secili_ipler = [ip for ip, k in self.kartlar.items() if k.secili]
-            if not secili_ipler:
-                secili_ipler = list(self.kartlar.keys())
-            if secili_ipler:
-                for ip in secili_ipler:
-                    threading.Thread(target=dosya_gonder, args=(ip, dosya_yolu, self), daemon=True).start()
-                self.durum_goster(f"{len(secili_ipler)} PC ye gonderiliyor...")
-            else:
-                self.durum_goster("Hic PC yok!")
+            if dosya_yolu:
+                secili_ipler = [ip for ip, k in self.kartlar.items() if k.secili]
+                if not secili_ipler:
+                    secili_ipler = list(self.kartlar.keys())
+                if secili_ipler:
+                    for ip in secili_ipler:
+                        threading.Thread(target=dosya_gonder, args=(ip, dosya_yolu, self), daemon=True).start()
+                    isim = os.path.basename(dosya_yolu)
+                    self.durum_goster(f"{isim} → {len(secili_ipler)} PC ye gonderiliyor...")
+                else:
+                    self.durum_goster("Hic PC yok!")
         dialog.destroy()
 
     def durum_goster(self, mesaj):
@@ -666,6 +701,7 @@ def main():
     pencere = HostPencere()
     pencere.show_all()
     threading.Thread(target=broadcast_dinle, args=(pencere,), daemon=True).start()
+    threading.Thread(target=kopuk_kontrol, args=(pencere,), daemon=True).start()
     Gtk.main()
 
 if __name__ == '__main__':

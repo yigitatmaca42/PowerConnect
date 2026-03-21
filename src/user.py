@@ -381,7 +381,9 @@ def servis_modu():
 # =============================================================================
 
 if __name__ == '__main__':
-    if os.path.abspath(sys.argv[0]) == KURULUM_DOSYA:
+    # /opt/powerconnect altinda calisiyorsa servis modu
+    exe_path = os.path.abspath(sys.argv[0])
+    if exe_path.startswith('/opt/powerconnect'):
         servis_modu()
     else:
         if os.geteuid() != 0:
