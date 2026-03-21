@@ -17,10 +17,10 @@ PowerConnect, öğretmenin ekranını öğrenci bilgisayarlarına gerçek zamanl
 
 ```bash
 # 1. Paketi indir
-wget https://github.com/yigitatmaca42/PowerConnect/releases/download/v1.0.2/powerconnect_1.0.2_amd64.deb
+wget https://github.com/yigitatmaca42/PowerConnect/releases/download/v1.0.3/powerconnect_1.0.3_amd64.deb
 
 # 2. Kur
-sudo dpkg -i powerconnect_1.0.2_amd64.deb
+sudo dpkg -i powerconnect_1.0.3_amd64.deb
 ```
 
 Kurulum tamamlandıktan sonra uygulamayı başlatmak için:
@@ -33,10 +33,10 @@ PowerConnect
 
 ```bash
 # 1. Paketi indir
-wget https://github.com/yigitatmaca42/PowerConnect/releases/download/v1.0.2/powerconnect-client_1.0.2_amd64.deb
+wget https://github.com/yigitatmaca42/PowerConnect/releases/download/v1.0.3/powerconnect-client_1.0.3_amd64.deb
 
 # 2. Kur
-sudo dpkg -i powerconnect-client_1.0.2_amd64.deb
+sudo dpkg -i powerconnect-client_1.0.3_amd64.deb
 ```
 
 Kurulum tamamlandıktan sonra servis otomatik olarak başlar. Bilgisayar her açıldığında arka planda çalışır, başka bir işlem gerekmez.
@@ -145,8 +145,8 @@ PowerConnect/
 │   ├── PowerConnect
 │   └── user
 ├── releases/       # Kurulum paketleri (.deb)
-│   ├── powerconnect_1.0.2_amd64.deb
-│   └── powerconnect-client_1.0.2_amd64.deb
+│   ├── powerconnect_1.0.3_amd64.deb
+│   └── powerconnect-client_1.0.3_amd64.deb
 └── screenshots/    # Ekran görüntüleri
 ```
 
