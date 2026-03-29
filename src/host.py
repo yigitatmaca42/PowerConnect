@@ -7,9 +7,105 @@ import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GLib, Gdk
 
-import socket, threading, struct, io, json, time, os
+import socket, threading, struct, io, json, time, os, subprocess
 import mss
 from PIL import Image
+
+def ag_baglantisini_hazirla():
+    """Uygulama acilinca arka planda ag baglantisini bir kez dener.
+    Tum ethernet arayuzleri bulunur, nmcli / dhcpcd / dhclient / udhcpc
+    sirayla denenir; biri basarili olur olmaz durur."""
+
+    def _arayuzleri_bul():
+        arayuzler = []
+        try:
+            sonuc = subprocess.run(
+                ['nmcli', '-t', '-f', 'DEVICE,TYPE,STATE', 'device'],
+                capture_output=True, text=True, timeout=5
+            )
+            for satir in sonuc.stdout.splitlines():
+                p = satir.split(':')
+                if len(p) >= 3 and p[1] == 'ethernet':
+                    arayuzler.append(p[0])
+        except Exception:
+            pass
+        try:
+            for ad in sorted(os.listdir('/sys/class/net')):
+                if ad.startswith(('eth', 'en', 'enp', 'ens', 'enx')) and ad not in arayuzler:
+                    arayuzler.append(ad)
+        except Exception:
+            pass
+        return arayuzler or ['eth0', 'enp0s3']
+
+    def _bagli_mi():
+        try:
+            r = subprocess.run(['nmcli', '-t', '-f', 'STATE', 'general'],
+                               capture_output=True, text=True, timeout=5)
+            if 'connected' in r.stdout:
+                return True
+        except Exception:
+            pass
+        try:
+            r = subprocess.run(['ip', 'addr', 'show'],
+                               capture_output=True, text=True, timeout=5)
+            for satir in r.stdout.splitlines():
+                if satir.strip().startswith('inet ') and '127.0.0.1' not in satir:
+                    return True
+        except Exception:
+            pass
+        return False
+
+    def _yap():
+        if _bagli_mi():
+            return  # Zaten bagli, hic bir sey yapma
+
+        for arayuz in _arayuzleri_bul():
+            try:
+                subprocess.run(['ip', 'link', 'set', arayuz, 'up'],
+                               capture_output=True, timeout=5)
+            except Exception:
+                pass
+
+            try:
+                subprocess.run(['nmcli', 'device', 'connect', arayuz],
+                               capture_output=True, timeout=10)
+                time.sleep(2)
+                if _bagli_mi(): return
+            except Exception:
+                pass
+
+            try:
+                subprocess.run(['nmcli', 'connection', 'up', 'ifname', arayuz],
+                               capture_output=True, timeout=10)
+                time.sleep(2)
+                if _bagli_mi(): return
+            except Exception:
+                pass
+
+            try:
+                subprocess.run(['dhcpcd', arayuz], capture_output=True, timeout=15)
+                time.sleep(2)
+                if _bagli_mi(): return
+            except Exception:
+                pass
+
+            try:
+                subprocess.run(['dhclient', '-1', arayuz],
+                               capture_output=True, timeout=15)
+                time.sleep(2)
+                if _bagli_mi(): return
+            except Exception:
+                pass
+
+            try:
+                subprocess.run(['udhcpc', '-i', arayuz, '-q'],
+                               capture_output=True, timeout=15)
+                time.sleep(2)
+                if _bagli_mi(): return
+            except Exception:
+                pass
+
+    threading.Thread(target=_yap, daemon=True).start()
 
 BROADCAST_PORT = 5559
 FPS            = 30
@@ -51,7 +147,7 @@ def broadcast_dinle(pencere):
             pass
 
 def kopuk_kontrol(pencere):
-    """Her 3 saniyede bir kopuk PC leri listeden kaldir."""
+    """Her 3 saniyede bir kopuk PC leri listeden siler."""
     while True:
         time.sleep(3)
         simdi = time.time()
@@ -60,7 +156,6 @@ def kopuk_kontrol(pencere):
         for ip in kopuklar:
             with son_gorunme_lock:
                 son_gorunme.pop(ip, None)
-            # Baglantiyida kes
             with baglantilar_lock:
                 bilgi = baglantilar.get(ip)
                 if bilgi:
@@ -101,7 +196,16 @@ def yayin_dongusu(ip, pencere):
                 img.save(buf, format="JPEG", quality=QUALITY)
                 veri = buf.getvalue()
                 conn.sendall(struct.pack('>I', len(veri)) + veri)
-            except:
+            except Exception:
+                with baglantilar_lock:
+                    bilgi = baglantilar.get(ip)
+                    if bilgi:
+                        bilgi['aktif'] = False
+                        try:
+                            bilgi['conn'].close()
+                        except:
+                            pass
+                        del baglantilar[ip]
                 break
             gecen = time.time() - t0
             bekle = aralik - gecen
@@ -109,19 +213,22 @@ def yayin_dongusu(ip, pencere):
                 time.sleep(bekle)
     GLib.idle_add(pencere.pc_baglanti_kesildi, ip)
 
-def _baglan_thread(ip, pencere):
+def _baglan_thread(ip, pencere, pencereli_mod=False):
     try:
         conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         conn.settimeout(5)
         conn.connect((ip, 5558))
         conn.settimeout(None)
         conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        # Pencere modunu client'a gonder: 'W' = pencereli, 'F' = penceresiz (fullscreen)
+        mod_byte = b'W' if pencereli_mod else b'F'
+        conn.sendall(mod_byte)
         with baglantilar_lock:
             baglantilar[ip] = {'conn': conn, 'aktif': True}
         GLib.idle_add(pencere.pc_baglandi, ip)
         threading.Thread(target=yayin_dongusu, args=(ip, pencere), daemon=True).start()
-    except Exception as e:
-        GLib.idle_add(pencere.pc_hata, ip, str(e))
+    except Exception:
+        GLib.idle_add(pencere.pc_hata, ip, "Bağlantı hatası")
 
 def baglantiyi_kes(ip, pencere):
     with baglantilar_lock:
@@ -164,8 +271,8 @@ def dosya_gonder(ip, dosya_yolu, pencere):
                      struct.pack('>I', len(veri)) + veri)
         conn.close()
         GLib.idle_add(pencere.durum_goster, f"✓ {dosya_adi} → {ip} gonderildi")
-    except Exception as e:
-        GLib.idle_add(pencere.durum_goster, f"✗ Hata ({ip}): {str(e).replace(chr(91)+chr(69)+chr(114)+chr(114)+chr(110)+chr(111), chr(72)+chr(97)+chr(116)+chr(97))}")
+    except Exception:
+        GLib.idle_add(pencere.durum_goster, f"✗ Hata ({ip}): Bağlantı hatası")
 
 # =============================================================================
 #  DOSYA GEZGINI
@@ -218,8 +325,8 @@ def gezgin_indir(ip, uzak_yol, dizin_mi, pencere, durum_label_ref):
             hedef_kok = os.path.join(masaustu, klasor_adi)
             _klasor_indir_recursive(ip, uzak_yol, hedef_kok, durum_label_ref)
             GLib.idle_add(durum_label_ref.set_text, f"İndirildi: {klasor_adi}")
-    except Exception as e:
-        GLib.idle_add(durum_label_ref.set_text, f"Hata: {e}")
+    except Exception:
+        GLib.idle_add(durum_label_ref.set_text, "Hata: Bağlantı hatası")
 
 def _klasor_indir_recursive(ip, uzak_yol, yerel_yol, durum_label_ref=None):
     os.makedirs(yerel_yol, exist_ok=True)
@@ -270,6 +377,13 @@ class GezginPencere(Gtk.Window):
         self.ana = ana_pencere
         self.set_default_size(700, 500)
         self.mevcut_yol = '/home'
+        try:
+            from gi.repository import GdkPixbuf
+            pb = GdkPixbuf.Pixbuf.new_from_file("/usr/share/pixmaps/powerconnect-small.png")
+            self.set_icon(pb)
+        except Exception:
+            pass
+
 
         ana = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         self.add(ana)
@@ -343,8 +457,8 @@ class GezginPencere(Gtk.Window):
                     GLib.idle_add(self._listeyi_goster, yanit['girişler'], yol)
                 else:
                     GLib.idle_add(self.durum.set_text, f"Hata: {yanit.get('mesaj')}")
-            except Exception as e:
-                GLib.idle_add(self.durum.set_text, f"Baglanti hatasi: {e}")
+            except Exception:
+                GLib.idle_add(self.durum.set_text, "Bağlantı hatası")
         threading.Thread(target=_yap, daemon=True).start()
 
     def _listeyi_goster(self, girişler, yol):
@@ -403,6 +517,8 @@ class PCKarti(Gtk.Frame):
         self.pencere_ref = pencere
         self.bagli = False
         self.secili = False
+        self.pencereli_mod = False  # Varsayilan: penceresiz (fullscreen)
+        self.cevrimdisi = False
 
         self.set_margin_top(6); self.set_margin_bottom(6)
         self.set_margin_start(6); self.set_margin_end(6)
@@ -416,6 +532,7 @@ class PCKarti(Gtk.Frame):
         self.check.connect("toggled", self.secim_degisti)
         kutu.pack_start(self.check, False, False, 0)
 
+        # Ekran ikonu
         ikon = Gtk.Label()
         ikon.set_markup('<span size="xx-large">🖥</span>')
         kutu.pack_start(ikon, False, False, 0)
@@ -442,6 +559,9 @@ class PCKarti(Gtk.Frame):
 
         self.show_all()
 
+    def _mod_degisti(self, widget):
+        pass  # Artık global mod kullaniliyor
+
     def sag_tik(self, widget, event):
         if event.button == 3:
             menu = Gtk.Menu()
@@ -464,13 +584,15 @@ class PCKarti(Gtk.Frame):
         if not self.bagli:
             self.btn.set_sensitive(False)
             self.durum_label.set_markup('<span color="#f39c12" size="small">Baglaniliyor...</span>')
-            threading.Thread(target=_baglan_thread, args=(self.ip, self.pencere_ref), daemon=True).start()
+            pencereli = (self.pencere_ref.global_mod_combo.get_active_id() == "pencereli")
+            threading.Thread(target=_baglan_thread, args=(self.ip, self.pencere_ref, pencereli), daemon=True).start()
         else:
             self.btn.set_sensitive(False)
             threading.Thread(target=baglantiyi_kes, args=(self.ip, self.pencere_ref), daemon=True).start()
 
     def set_bagli(self):
         self.bagli = True
+        self.cevrimdisi = False
         self.durum_label.set_markup('<span color="#27ae60" size="small">● Yayin aktif</span>')
         self.btn.set_label("■  Geri Sal")
         self.btn.get_style_context().remove_class("suggested-action")
@@ -479,7 +601,16 @@ class PCKarti(Gtk.Frame):
 
     def set_kesildi(self):
         self.bagli = False
+        self.cevrimdisi = False
         self.durum_label.set_markup('<span color="#888" size="small">Bekliyor</span>')
+        self.btn.set_label("▶  Baglan")
+        self.btn.get_style_context().remove_class("destructive-action")
+        self.btn.get_style_context().add_class("suggested-action")
+        self.btn.set_sensitive(True)
+
+    def set_cevrimdisi(self):
+        self.cevrimdisi = True
+        self.durum_label.set_markup('<span color="#e67e22" size="small">⚠ Cevrimdisi</span>')
         self.btn.set_label("▶  Baglan")
         self.btn.get_style_context().remove_class("destructive-action")
         self.btn.get_style_context().add_class("suggested-action")
@@ -508,6 +639,17 @@ class HostPencere(Gtk.Window):
         self.set_default_size(1000, 650)
         self.connect("destroy", self.kapat)
 
+        # Gorev cubugu ve pencere logosu
+        self.set_icon_name("powerconnect")
+        # Fallback: eger ozel ikon yoksa genel ag ikonu kullan
+        try:
+            from gi.repository import GdkPixbuf
+            icon_theme = Gtk.IconTheme.get_default()
+            if not icon_theme.has_icon("powerconnect"):
+                self.set_icon_name("network-wired")
+        except Exception:
+            pass
+
         self.pc_listesi = {}
         self.kartlar    = {}
 
@@ -518,6 +660,16 @@ class HostPencere(Gtk.Window):
         ust.set_margin_top(10); ust.set_margin_bottom(8)
         ust.set_margin_start(12); ust.set_margin_end(12)
         ana.pack_start(ust, False, False, 0)
+
+        # Sol ust logo
+        try:
+            from gi.repository import GdkPixbuf
+            logo_pb = GdkPixbuf.Pixbuf.new_from_file_at_scale(
+                "/usr/share/pixmaps/powerconnect.png", 28, 28, True)
+            logo_img = Gtk.Image.new_from_pixbuf(logo_pb)
+            ust.pack_start(logo_img, False, False, 0)
+        except Exception:
+            pass
 
         baslik = Gtk.Label()
         baslik.set_markup('<b>PowerConnect — Yonetici Paneli</b>')
@@ -542,6 +694,14 @@ class HostPencere(Gtk.Window):
         self.sayac_label = Gtk.Label()
         self.sayac_label.set_markup('<span color="#888">0 PC</span>')
         ust.pack_end(self.sayac_label, False, False, 0)
+
+        # Global baglanti turu dropdown - sag uste (sayacin solunda)
+        self.global_mod_combo = Gtk.ComboBoxText()
+        self.global_mod_combo.append("penceresiz", "🖥  Penceresiz")
+        self.global_mod_combo.append("pencereli",  "⧉  Pencereli")
+        self.global_mod_combo.set_active_id("penceresiz")
+        self.global_mod_combo.set_tooltip_text("Tüm bağlantılar için ekran modu")
+        ust.pack_end(self.global_mod_combo, False, False, 0)
 
         ana.pack_start(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL), False, False, 0)
 
@@ -585,24 +745,21 @@ class HostPencere(Gtk.Window):
         self.btn_dosya.connect("clicked", self.dosya_sec)
         alt.pack_end(self.btn_dosya, False, False, 0)
 
-    def pc_guncelle(self, ad, ip):
-        if ip in self.kartlar:
-            return
-        self.pc_listesi[ip] = ad
-        kart = PCKarti(ad, ip, self)
-        self.kartlar[ip] = kart
-        self.flow.add(kart)
-        self.flow.show_all()
-        self._filtrele()
-        self._sayac_guncelle()
-
     def pc_baglandi(self, ip):
         if ip in self.kartlar:
             self.kartlar[ip].set_bagli()
+        # En az bir baglanti varsa global combo'yu kilitle
+        with baglantilar_lock:
+            bagli_sayisi = len(baglantilar)
+        self.global_mod_combo.set_sensitive(bagli_sayisi == 0)
 
     def pc_baglanti_kesildi(self, ip):
         if ip in self.kartlar:
             self.kartlar[ip].set_kesildi()
+        # Hic baglanti kalmadiysa global combo'yu serbest birak
+        with baglantilar_lock:
+            bagli_sayisi = len(baglantilar)
+        self.global_mod_combo.set_sensitive(bagli_sayisi == 0)
 
     def pc_kaldir(self, ip):
         if ip in self.kartlar:
@@ -613,6 +770,29 @@ class HostPencere(Gtk.Window):
             del self.kartlar[ip]
             self.pc_listesi.pop(ip, None)
             self._sayac_guncelle()
+
+    def pc_cevrimdisi(self, ip):
+        """PC'yi listeden silme, sadece cevrimdisi olarak isaretler."""
+        if ip in self.kartlar:
+            self.kartlar[ip].set_cevrimdisi()
+
+    def pc_guncelle(self, ad, ip):
+        with son_gorunme_lock:
+            son_gorunme[ip] = time.time()
+        if ip in self.kartlar:
+            # Zaten var - cevrimdisi isaretliyse tekrar aktif yap
+            kart = self.kartlar[ip]
+            if kart.cevrimdisi and not kart.bagli:
+                kart.durum_label.set_markup('<span color="#888" size="small">Bekliyor</span>')
+                kart.cevrimdisi = False
+            return
+        self.pc_listesi[ip] = ad
+        kart = PCKarti(ad, ip, self)
+        self.kartlar[ip] = kart
+        self.flow.add(kart)
+        self.flow.show_all()
+        self._filtrele()
+        self._sayac_guncelle()
 
     def pc_hata(self, ip, mesaj):
         if ip in self.kartlar:
@@ -633,12 +813,13 @@ class HostPencere(Gtk.Window):
                 child.set_visible(kart.eslesiyor(arama))
 
     def hepsine_baglan(self, widget):
+        pencereli = (self.global_mod_combo.get_active_id() == "pencereli")
         for ip, kart in self.kartlar.items():
             child = kart.get_parent()
             if child and child.get_visible() and not kart.bagli:
                 kart.btn.set_sensitive(False)
                 kart.durum_label.set_markup('<span color="#f39c12" size="small">Baglaniliyor...</span>')
-                threading.Thread(target=_baglan_thread, args=(ip, self), daemon=True).start()
+                threading.Thread(target=_baglan_thread, args=(ip, self, pencereli), daemon=True).start()
 
     def hepsini_geri_sal(self, widget):
         for ip in list(baglantilar.keys()):
@@ -667,6 +848,13 @@ class HostPencere(Gtk.Window):
             Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
             "Gonder", Gtk.ResponseType.OK
         )
+        try:
+            from gi.repository import GdkPixbuf
+            pb = GdkPixbuf.Pixbuf.new_from_file("/usr/share/pixmaps/powerconnect-small.png")
+            dialog.set_icon(pb)
+        except Exception:
+            pass
+
         yanit = dialog.run()
         if yanit == Gtk.ResponseType.OK:
             dosya_yolu = dialog.get_filename()
@@ -684,8 +872,7 @@ class HostPencere(Gtk.Window):
         dialog.destroy()
 
     def durum_goster(self, mesaj):
-        temiz = str(mesaj).replace('[Error', '[Hata').replace('Error', 'Hata')
-        self.durum_bar.set_markup(f'<span color="#888" size="small">{temiz}</span>')
+        self.durum_bar.set_markup(f'<span color="#888" size="small">{mesaj}</span>')
 
     def kapat(self, *args):
         with baglantilar_lock:
@@ -698,6 +885,7 @@ class HostPencere(Gtk.Window):
         Gtk.main_quit()
 
 def main():
+    ag_baglantisini_hazirla()  # Arka planda ag baglantisini hazirla
     pencere = HostPencere()
     pencere.show_all()
     threading.Thread(target=broadcast_dinle, args=(pencere,), daemon=True).start()
