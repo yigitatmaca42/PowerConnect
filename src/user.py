@@ -24,6 +24,65 @@ def kendi_ip():
     except:
         return "127.0.0.1"
 
+def ag_baglantisini_hazirla():
+    """Servis baslarken arka planda ag baglantisini otomatik saglar."""
+    def _arayuz_bul():
+        try:
+            sonuc = subprocess.run(
+                ['nmcli', '-t', '-f', 'DEVICE,TYPE,STATE', 'device'],
+                capture_output=True, text=True, timeout=5
+            )
+            for satir in sonuc.stdout.splitlines():
+                parcalar = satir.split(':')
+                if len(parcalar) >= 3 and parcalar[1] == 'ethernet':
+                    return parcalar[0]
+        except Exception:
+            pass
+        try:
+            for ad in os.listdir('/sys/class/net'):
+                if ad.startswith(('e', 'en', 'eth')):
+                    return ad
+        except Exception:
+            pass
+        return 'eth0'
+
+    def _yap():
+        for deneme in range(5):
+            try:
+                sonuc = subprocess.run(
+                    ['nmcli', '-t', '-f', 'STATE', 'general'],
+                    capture_output=True, text=True, timeout=5
+                )
+                if 'connected' in sonuc.stdout:
+                    return
+            except Exception:
+                pass
+            arayuz = _arayuz_bul()
+            try:
+                subprocess.run(
+                    ['nmcli', 'device', 'connect', arayuz],
+                    capture_output=True, timeout=10
+                )
+                time.sleep(3)
+                sonuc2 = subprocess.run(
+                    ['nmcli', '-t', '-f', 'STATE', 'general'],
+                    capture_output=True, text=True, timeout=5
+                )
+                if 'connected' in sonuc2.stdout:
+                    return
+            except Exception:
+                pass
+            try:
+                subprocess.run(
+                    ['dhclient', '-1', arayuz],
+                    capture_output=True, timeout=15
+                )
+                return
+            except Exception:
+                pass
+            time.sleep(5)
+    threading.Thread(target=_yap, daemon=True).start()
+
 # =============================================================================
 #  KURULUM MODU
 # =============================================================================
@@ -184,6 +243,7 @@ def _tam_al(conn, n):
 # =============================================================================
 
 def servis_modu():
+    ag_baglantisini_hazirla()  # Arka planda ag baglantisini hazirla
     import gi
     gi.require_version('Gtk', '3.0')
     from gi.repository import Gtk, GLib, GdkPixbuf, Gdk
@@ -191,7 +251,7 @@ def servis_modu():
 
     class IzlemePencere(Gtk.Window):
         def __init__(self):
-            super().__init__()
+            super().__init__(title="PowerConnect Client")
             self.set_decorated(False)
             self.fullscreen()
             self.set_keep_above(True)
@@ -203,14 +263,35 @@ def servis_modu():
             self.connect("key-release-event",  lambda *a: True)
             self.connect("button-press-event", lambda *a: True)
             self.connect("delete-event",       lambda *a: True)
+            # Pencere ve gorev cubugu ikonu
+            try:
+                ikon_yollari = [
+                    '/usr/share/pixmaps/powerconnect-client.png',
+                    '/usr/share/icons/hicolor/256x256/apps/powerconnect-client.png',
+                    '/usr/share/pixmaps/powerconnect.png',
+                    '/usr/share/icons/hicolor/256x256/apps/powerconnect.png',
+                ]
+                for yol in ikon_yollari:
+                    if os.path.exists(yol):
+                        pb = GdkPixbuf.Pixbuf.new_from_file(yol)
+                        self.set_icon(pb)
+                        break
+                else:
+                    self.set_icon_name('powerconnect-client')
+            except Exception:
+                pass
             self.show_all()
             self.hide()
+            self._pencereli_mod = False
 
         def kare_goster(self, veri):
             try:
                 img = Image.open(io.BytesIO(veri)).convert('RGB')
-                ekran = Gdk.Screen.get_default()
-                img.thumbnail((ekran.get_width(), ekran.get_height()), Image.LANCZOS)
+                # Pencere boyutuna gore scale et (pencereli modda resize destegi)
+                alloc = self.get_allocation()
+                pen_w = alloc.width  if alloc.width  > 1 else self.get_screen().get_width()
+                pen_h = alloc.height if alloc.height > 1 else self.get_screen().get_height()
+                img.thumbnail((pen_w, pen_h), Image.LANCZOS)
                 w, h = img.size
                 raw = img.tobytes()
                 try:
@@ -224,14 +305,52 @@ def servis_modu():
             except:
                 pass
 
-        def ac(self):
-            self.show_all(); self.fullscreen(); self.present()
+        def ac(self, pencereli=False):
+            self._pencereli_mod = pencereli
+            if pencereli:
+                # Pencereli mod: baslik cubugu var, alt+tab/minimize serbest
+                # Boyutlandirma ve kapat (X) engelleniyor
+                self.set_title("PowerConnect — Ogretmen Ekrani")
+                self.set_decorated(True)
+                self.set_resizable(True)
+                self.set_keep_above(False)
+                self.set_deletable(False)   # X butonu calismiyor
+                self.unfullscreen()
+                self.resize(800, 600)
+                try:
+                    self.disconnect_by_func(self._engelle)
+                except Exception:
+                    pass
+            else:
+                # Penceresiz mod: tam ekran, her sey kilitli
+                self.set_decorated(False)
+                self.set_keep_above(True)
+                self.set_deletable(False)
+                self.fullscreen()
+            self.show_all()
+            self.present()
 
         def kapat_ekran(self):
             self.hide()
+            # Bir sonraki baglanti icin sifirla
+            self.set_decorated(False)
+            self.set_keep_above(True)
+            self.set_deletable(False)
 
     def ekran_baglanti_isle(conn, pencere):
-        GLib.idle_add(pencere.ac)
+        # Ilk byte mod bilgisi: b'W' = pencereli, b'F' = fullscreen
+        try:
+            # Keepalive: baglanti sessizce kopunca anlasin
+            conn.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+            conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 10)
+            conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 5)
+            conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 3)
+            conn.settimeout(30)
+            mod_byte = conn.recv(1)
+            pencereli = (mod_byte == b'W')
+        except:
+            pencereli = False
+        GLib.idle_add(pencere.ac, pencereli)
         try:
             while True:
                 boyut = struct.unpack('>I', _tam_al(conn, 4))[0]
