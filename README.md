@@ -5,7 +5,7 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Python](https://img.shields.io/badge/Python-3.x-blue.svg)](https://python.org)
 [![Pardus](https://img.shields.io/badge/Pardus-23%2B-red.svg)](https://pardus.org.tr)
-[![Release](https://img.shields.io/badge/Release-v1.0.4-green.svg)](https://github.com/yigitatmaca42/PowerConnect/releases/latest)
+[![Release](https://img.shields.io/badge/Release-v1.0.5-green.svg)](https://github.com/yigitatmaca42/PowerConnect/releases/latest)
 
 PowerConnect, öğretmenin ekranını öğrenci bilgisayarlarına gerçek zamanlı olarak yayınlamasını, dosya göndermesini ve öğrenci dosya sistemine erişmesini sağlayan hafif ve kurulumu kolay bir uygulamadır. Tamamen Pardus Linux üzerinde geliştirilmiş olup yerli ve milli ekosisteme katkı sağlamayı hedeflemektedir.
 
@@ -17,10 +17,10 @@ PowerConnect, öğretmenin ekranını öğrenci bilgisayarlarına gerçek zamanl
 
 ```bash
 # 1. Paketi indir
-wget https://github.com/yigitatmaca42/PowerConnect/releases/download/v1.0.4/powerconnect_1.0.4_amd64.deb
+wget https://github.com/yigitatmaca42/PowerConnect/releases/download/v1.0.5/powerconnect_1.0.5_amd64.deb
 
 # 2. Kur
-sudo dpkg -i powerconnect_1.0.4_amd64.deb
+sudo dpkg -i powerconnect_1.0.5_amd64.deb
 ```
 
 Kurulum tamamlandıktan sonra uygulamayı başlatmak için:
@@ -33,15 +33,16 @@ PowerConnect
 
 ```bash
 # 1. Paketi indir
-wget https://github.com/yigitatmaca42/PowerConnect/releases/download/v1.0.4/powerconnect-client_1.0.4_amd64.deb
+wget https://github.com/yigitatmaca42/PowerConnect/releases/download/v1.0.5/powerconnect-client_1.0.5_amd64.deb
 
 # 2. Kur
-sudo dpkg -i powerconnect-client_1.0.4_amd64.deb
+sudo dpkg -i powerconnect-client_1.0.5_amd64.deb
+sudo apt install -f -y
 ```
 
 Kurulum tamamlandıktan sonra servis otomatik olarak başlar. Bilgisayar her açıldığında arka planda çalışır, başka bir işlem gerekmez.
 
-> Öğrenci servisi `/opt/powerconnect/PowerConnect-Client` konumuna kurulur ve kilitlenir. `rm -rf` ile bile silinemez, yalnızca format atılarak kaldırılabilir.
+> Öğrenci servisi `/opt/powerconnect/user` konumuna kurulur ve kilitlenir. `rm -rf` ile bile silinemez, yalnızca format atılarak kaldırılabilir.
 
 Tüm sürümler için → [Releases](https://github.com/yigitatmaca42/PowerConnect/releases)
 
@@ -50,7 +51,9 @@ Tüm sürümler için → [Releases](https://github.com/yigitatmaca42/PowerConne
 ## Özellikler
 
 - **Otomatik Keşif** — Aynı ağdaki öğrenci PC'ler UDP broadcast ile otomatik bulunur, IP girişi gerekmez
-- **Gerçek Zamanlı Ekran Yayını** — Öğretmen ekranı 30 FPS ile öğrencilere iletilir
+- **Canlı Ekran Önizleme** — Her öğrenci PC kartında ekran canlı olarak görüntülenir
+- **Gerçek Zamanlı Ekran Yayını** — Öğretmen ekranı 25 FPS ile öğrencilere iletilir
+- **Öğrenci Ekranı İzleme ve Kontrolü** — PC kartındaki küçük önizlemeye tıklanarak öğrenci ekranı büyük pencerede açılır; fare, klavye ve scroll öğrenci bilgisayarına iletilir
 - **Pencereli / Penceresiz Mod** — Penceresiz modda tam ekran ve öğrenci kilidi, pencereli modda alt+tab serbestliği
 - **Öğrenci Kilidi** — Penceresiz modda öğrenci klavye/fare kullanamaz, pencereyi kapatamaz
 - **Çoklu Bağlantı** — Aynı anda birden fazla öğrenci PC'ye bağlanılabilir
@@ -60,6 +63,7 @@ Tüm sürümler için → [Releases](https://github.com/yigitatmaca42/PowerConne
 - **Uzak Dosya Gezgini** — Öğrenci dosya sistemi görüntülenebilir, dosya ve klasörler indirilebilir
 - **Otomatik Ağ Bağlantısı** — Açılışta ağ yoksa nmcli/dhcpcd/dhclient sırayla denenir, otomatik IP alınır
 - **Kopuk PC Tespiti** — 5 saniye broadcast gelmezse PC panelden otomatik kaldırılır
+- **Self-loop Koruması** — Yönetici PC'de client kuruluysa kendi kendini listede göstermez
 - **Silinmez Kurulum** — `chattr +i` ile kilitli, format dışında silinemez
 - **Otomatik Başlatma** — Systemd user servisi olarak her açılışta çalışır
 
@@ -69,13 +73,17 @@ Tüm sürümler için → [Releases](https://github.com/yigitatmaca42/PowerConne
 
 ### Bağlantı
 
-Uygulama açıldığında aynı ağdaki tüm öğrenci PC'ler otomatik olarak panelde listelenir. "Hepsine Bağlan" butonuyla tüm PC'lere aynı anda, "Bağlan" butonuyla tek tek bağlanılabilir.
+Uygulama açıldığında aynı ağdaki tüm öğrenci PC'ler otomatik olarak panelde listelenir. Her PC kartında öğrencinin ekranı canlı olarak görüntülenir. "Hepsine Bağlan" butonuyla tüm PC'lere aynı anda, "Bağlan" butonuyla tek tek bağlanılabilir.
 
 ![Toplu bağlantı](screenshots/resim_1.png)
 
 Tek tek de istediğiniz PC'ye manuel olarak bağlanabilirsiniz.
 
 ![Tekil bağlantı](screenshots/resim_2.png)
+
+Tüm PC'lere aynı anda bağlanıldığında kartlar "Yayın aktif" durumuyla güncellenir.
+
+![Tüm PC'ler bağlı](screenshots/resim_3.png)
 
 ### Ekran Modu
 
@@ -84,69 +92,73 @@ Bağlanmadan önce ekran modunu seçebilirsiniz. Bağlantı kurulduktan sonra mo
 - **Penceresiz** — Öğrenci ekranı tam ekran alınır, klavye/fare engellenir
 - **Pencereli** — Öğrenci alt+tab atabilir, ekranı küçültebilir ama kapatamaz
 
-![Mod seçimi](screenshots/resim_3.png)
+![Mod seçimi](screenshots/resim_6.png)
 
 Pencereli modda öğrenci pencereyi kapatamaz, sadece taşıyabilir veya küçültebilir.
 
-![Pencereli mod](screenshots/resim_4.png)
+![Pencereli mod](screenshots/resim_7.png)
 
 ### PC Arama ve Filtreleme
 
 Arama çubuğuna yazdığınız ifadeyle listeyi daraltabilirsiniz. "Hepsine Bağlan" butonu yalnızca filtredeki PC'lere bağlanır.
 
-![PC arama](screenshots/resim_5.png)
+![PC arama](screenshots/resim_4.png)
+
+### Öğrenci Ekranı İzleme ve Kontrolü
+
+Paneldeki herhangi bir PC kartındaki küçük önizlemeye tıklandığında öğrencinin ekranı büyük pencerede açılır ve kontrol moduna geçilir.
+
+![Sağ tık menüsü](screenshots/resim_8.png)
+
+Bu pencerede fare hareketleri, tıklamalar, klavye girdileri ve kaydırma (scroll) gerçek zamanlı olarak öğrenci bilgisayarına iletilir. Öğrenci ekranı, yönetici penceresi küçültülse bile her zaman kendi monitörünün tam çözünürlüğünde görüntülenir.
+
+![Öğrenci ekranı izleme ve kontrol](screenshots/resim_9.png)
 
 ### Uzak Dosya Gezgini
 
 Herhangi bir PC kartına sağ tıklayarak o bilgisayarın dosyalarına göz atabilirsiniz.
 
-![Sağ tık menüsü](screenshots/resim_6.png)
-
 Gezgin otomatik olarak öğrencinin home dizinini açar. Sol ok ile üst dizine, ev ikonu ile home'a dönülebilir.
 
-![Home dizini](screenshots/resim_7.png)
+![Home dizini](screenshots/resim_10.png)
 
 Öğrenci PC'nin tüm klasör yapısını gezebilirsiniz.
 
-![Klasör gezintisi](screenshots/resim_8.png)
+![Klasör gezintisi](screenshots/resim_11.png)
 
 Masaüstündeki dosya ve klasörler listelenir, toplam öge sayısı altta gösterilir.
 
-![Masaüstü içeriği](screenshots/resim_9.png)
+![Masaüstü içeriği](screenshots/resim_12.png)
 
 ### Dosya İndirme
 
 Bir ögeyi seçip "Seçili Dosyayı İndir" butonuyla kendi bilgisayarınıza indirebilirsiniz.
 
-![Dosya indirme](screenshots/resim_10.png)
+![Dosya indirme](screenshots/resim_13.png)
 
 İndirme tamamlandığında dosya adıyla birlikte bildirim gösterilir.
 
-![İndirme tamamlandı](screenshots/resim_11.png)
+![İndirme tamamlandı](screenshots/resim_14.png)
 
 ### Dosya Gönderme
 
 "Hepsini Seç" ile tüm PC'leri, kutucuğa tıklayarak tek tek seçebilirsiniz. Seçili PC sayısı butonların yanında gösterilir.
 
-![PC seçimi](screenshots/resim_12.png)
+![PC seçimi](screenshots/resim_16.png)
 
 "Dosya At" butonuna basınca kendi bilgisayarınızın dosya yöneticisi açılır.
 
 > **Not:** Klasör göndermek için önce zip/rar olarak sıkıştırmanız gerekmektedir.
 
-![Dosya seçici](screenshots/resim_13.png)
+![Dosya seçici](screenshots/resim_18.png)
 
 Gönderim başladığında hangi PC'ye gönderildiği anlık olarak güncellenir.
 
-![Gönderim durumu](screenshots/resim_14.png)
-
-Gönderim tamamlandığında dosya adı ve kaç PC'ye gittiği gösterilir.
-
-![Gönderim tamamlandı](screenshots/resim_15.png)
+![Gönderim durumu](screenshots/resim_19.png)
 
 Gönderilen dosya tüm öğrenci PC'lerin masaüstüne sorunsuz düşer.
 
-![Masaüstüne ulaştı](screenshots/resim_16.png)
+![Masaüstüne ulaştı](screenshots/resim_20.png)
 
 ---
 
@@ -161,11 +173,11 @@ PowerConnect/
 │   ├── PowerConnect
 │   └── PowerConnect-Client
 ├── releases/             # Kurulum paketleri (.deb)
-│   ├── powerconnect_1.0.4_amd64.deb
-│   └── powerconnect-client_1.0.4_amd64.deb
+│   ├── powerconnect_1.0.5_amd64.deb
+│   └── powerconnect-client_1.0.5_amd64.deb
 ├── assets/               # Logo ve ikonlar
-│   ├── powerconnect.png
-│   └── powerconnect-small.png
+│   ├── powerconnect.png       (626x626)
+│   └── powerconnect-small.png (32x32)
 └── screenshots/          # Ekran görüntüleri
 ```
 
@@ -177,6 +189,7 @@ PowerConnect/
 | 5558 | TCP | Ekran yayını + mod bilgisi |
 | 5557 | TCP | Dosya gönderme |
 | 5556 | TCP | Uzak dosya gezgini |
+| 5555 | TCP | Öğrenci ekranı izleme ve kontrolü |
 
 ---
 
@@ -186,10 +199,16 @@ PowerConnect/
 pip3 install pyinstaller mss Pillow --break-system-packages
 
 # Öğretmen uygulaması
-pyinstaller --onefile src/host.py -n PowerConnect
+pyinstaller --onefile \
+  --add-data "assets/powerconnect.png:assets" \
+  --add-data "assets/powerconnect-small.png:assets" \
+  src/host.py -n PowerConnect
 
 # Öğrenci uygulaması
-pyinstaller --onefile src/user.py -n PowerConnect-Client
+pyinstaller --onefile \
+  --add-data "assets/powerconnect.png:assets" \
+  --add-data "assets/powerconnect-small.png:assets" \
+  src/user.py -n PowerConnect-Client
 ```
 
 ---
