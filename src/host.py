@@ -133,12 +133,9 @@ DOSYA_AL_PORT    = 5557
 GEZGIN_PORT      = 5556
 IZLE_PORT        = 5555
 
-IZLE_FPS         = 24      # Büyük izleme FPS
-IZLE_QUALITY     = 80
-IZLE_MAX_W       = 1600
-IZLE_MAX_H       = 900
-ONIZLEME_FPS     = 12
-ONIZLEME_QUALITY = 55
+IZLE_MAX_W       = 1600    # Büyük izleme penceresi maks genişlik
+IZLE_MAX_H       = 900     # Büyük izleme penceresi maks yükseklik
+ONIZLEME_FPS     = 12      # Küçük kart önizleme FPS
 
 baglantilar      = {}
 baglantilar_lock = threading.Lock()
@@ -345,7 +342,6 @@ def _kare_al(conn):
 
 def onizleme_dongusu(ip, pencere_ref):
     """Öğrenciden sürekli ONIZLEME_FPS kare çekip kartı günceller. PC kaldırılınca durur."""
-    aralik = 1.0 / ONIZLEME_FPS
     while True:
         # PC hâlâ listede mi? Değilse thread'i durdur
         with son_gorunme_lock:
@@ -360,8 +356,8 @@ def onizleme_dongusu(ip, pencere_ref):
             conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             conn.settimeout(5)
             conn.connect((ip, IZLE_PORT))
-            conn.settimeout(aralik * 3 + 2)
-            mod = json.dumps({'mod': 'onizleme'}).encode()
+            conn.settimeout(3.0 / ONIZLEME_FPS + 2)
+            mod = json.dumps({'mod': 'izleme'}).encode()
             conn.sendall(struct.pack('>I', len(mod)) + mod)
             while True:
                 # PC kaldırıldı mı kontrol et
@@ -467,7 +463,7 @@ class BuyukIzlemePencere(Gtk.Window):
         ana_kutu.pack_start(baslik_kutu, False, False, 0)
 
         baslik_lbl = Gtk.Label()
-        baslik_lbl.set_markup(f'<b>📺 {ad}</b>  <span color="#888" size="small">{ip}</span>')
+        baslik_lbl.set_markup(f'<b>📺 {_guvenli_metin(ad)}</b>  <span color="#888" size="small">{_guvenli_metin(ip)}</span>')
         baslik_kutu.pack_start(baslik_lbl, True, True, 0)
 
         self.durum_lbl = Gtk.Label()
@@ -497,11 +493,13 @@ class BuyukIzlemePencere(Gtk.Window):
         ana_kutu.pack_start(self.event_box, True, True, 0)
 
         # Image'ı ortalayan bir Box içine koy — gerçek ekran alanına tam oturması için
-        self._img_align = Gtk.Alignment.new(0.5, 0.5, 0, 0)
-        self.event_box.add(self._img_align)
+        img_kutu = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        img_kutu.set_valign(Gtk.Align.CENTER)
+        img_kutu.set_halign(Gtk.Align.CENTER)
+        self.event_box.add(img_kutu)
 
         self.image = Gtk.Image()
-        self._img_align.add(self.image)
+        img_kutu.pack_start(self.image, True, True, 0)
 
         ana_kutu.pack_start(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL), False, False, 0)
 
@@ -544,7 +542,7 @@ class BuyukIzlemePencere(Gtk.Window):
                 conn.settimeout(5)
                 conn.connect((self.ip, IZLE_PORT))
                 conn.settimeout(20)
-                mod = json.dumps({'mod': 'onizleme'}).encode()
+                mod = json.dumps({'mod': 'izleme'}).encode()
                 conn.sendall(struct.pack('>I', len(mod)) + mod)
                 self.conn_izle = conn
                 GLib.idle_add(self.durum_lbl.set_markup,
@@ -687,9 +685,22 @@ class BuyukIzlemePencere(Gtk.Window):
                 time.sleep(2)
 
     def _koordinat_donustur(self, lx, ly):
-        """Widget koordinatını uzak ekran koordinatına çevirir. Image offset'i hesaba katılır."""
-        ix = lx - self._img_offset_x
-        iy = ly - self._img_offset_y
+        """
+        event_box koordinatını uzak ekran koordinatına çevirir.
+        image widget'ının event_box içindeki gerçek pozisyonunu
+        translate_coordinates ile alır — manuel offset hesabına güvenmez.
+        """
+        try:
+            # image widget'ının event_box içindeki gerçek sol-üst köşesi
+            ok, ix_offset, iy_offset = self.image.translate_coordinates(
+                self.event_box, 0, 0)
+            if not ok:
+                ix_offset, iy_offset = self._img_offset_x, self._img_offset_y
+        except Exception:
+            ix_offset, iy_offset = self._img_offset_x, self._img_offset_y
+
+        ix = lx - ix_offset
+        iy = ly - iy_offset
         ix = max(0, min(ix, self._img_w))
         iy = max(0, min(iy, self._img_h))
         x = int(ix / max(self._img_w, 1) * self._uzak_w)
@@ -939,7 +950,6 @@ class GezginPencere(Gtk.Window):
         except Exception:
             pass
 
-
         ana = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         self.add(ana)
 
@@ -968,7 +978,7 @@ class GezginPencere(Gtk.Window):
         scrolled.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
         ana.pack_start(scrolled, True, True, 0)
 
-        self.store = Gtk.ListStore(str, str, bool, str)  # ikon, isim, dizin, tam_yol
+        self.store = Gtk.ListStore(str, str, bool, str, str)  # ikon, isim, dizin, tam_yol, boyut_str
         self.treeview = Gtk.TreeView(model=self.store)
         self.treeview.connect("row-activated", self.satir_tikla)
 
@@ -980,7 +990,7 @@ class GezginPencere(Gtk.Window):
         col_isim.set_expand(True)
         self.treeview.append_column(col_isim)
 
-        col_boyut = Gtk.TreeViewColumn("Boyut", Gtk.CellRendererText(), text=3)
+        col_boyut = Gtk.TreeViewColumn("Boyut", Gtk.CellRendererText(), text=4)
         self.treeview.append_column(col_boyut)
 
         scrolled.add(self.treeview)
@@ -1032,7 +1042,7 @@ class GezginPencere(Gtk.Window):
                     boyut = f"{b//1024} KB"
                 else:
                     boyut = f"{b//1024//1024} MB"
-            self.store.append([ikon, g['isim'], g['dizin'], g['yol']])
+            self.store.append([ikon, g['isim'], g['dizin'], g['yol'], boyut])
         self.durum.set_text(f"{len(girişler)} öge")
 
     def satir_tikla(self, treeview, path, column):
@@ -1185,9 +1195,6 @@ class PCKarti(Gtk.Frame):
         if event.button == 1:
             buyuk_izleme_ac(self.ip, self.ad, self.pencere_ref)
 
-    def _mod_degisti(self, widget):
-        pass  # Artık global mod kullaniliyor
-
     def sag_tik(self, widget, event):
         if event.button == 3:
             menu = Gtk.Menu()
@@ -1324,8 +1331,6 @@ class HostPencere(Gtk.Window):
         self.btn_geri.connect("clicked", self.hepsini_geri_sal)
         ust.pack_start(self.btn_geri, False, False, 0)
 
-
-
         self.sayac_label = Gtk.Label()
         self.sayac_label.set_markup('<span color="#888">0 PC</span>')
         ust.pack_end(self.sayac_label, False, False, 0)
@@ -1384,11 +1389,6 @@ class HostPencere(Gtk.Window):
         """Öğrenci önizleme karesini ilgili PCKarti'na iletir."""
         if ip in self.kartlar:
             self.kartlar[ip].onizleme_guncelle(veri)
-
-    def _secili_veya_tumunun_ipleri(self):
-        secili = [ip for ip, k in self.kartlar.items() if k.secili]
-        return secili if secili else list(self.kartlar.keys())
-
 
     def pc_baglandi(self, ip):
         if ip in self.kartlar:
