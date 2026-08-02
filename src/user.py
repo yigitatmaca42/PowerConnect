@@ -237,7 +237,6 @@ def kurulum_yap():
 
 # =============================================================================
 #  SERVIS MODU
-
 # =============================================================================
 
 signal.signal(signal.SIGTERM, lambda s, f: None)
@@ -380,10 +379,6 @@ def servis_modu():
                 self.set_deletable(False)   # X butonu calismiyor
                 self.unfullscreen()
                 self.resize(800, 600)
-                try:
-                    self.disconnect_by_func(self._engelle)
-                except Exception:
-                    pass
             else:
                 # Penceresiz mod: tam ekran, her sey kilitli
                 self.set_decorated(False)
@@ -611,11 +606,11 @@ def servis_modu():
             import mss
             conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
 
-            # İlk mesaj: mod bilgisi {'mod': 'onizleme'} veya {'mod': 'kontrol'}
+            # İlk mesaj: mod bilgisi {'mod': 'izleme'} veya {'mod': 'kontrol'}
             mod_len_b = _tam_al(conn, 4)
             mod_len = struct.unpack('>I', mod_len_b)[0]
             mod_veri = json.loads(_tam_al(conn, mod_len).decode())
-            mod = mod_veri.get('mod', 'onizleme')
+            mod = mod_veri.get('mod', 'izleme')
 
             if mod == 'kontrol':
                 # Kontrol modu: sadece komut alır, kare göndermez.
@@ -723,9 +718,6 @@ def servis_modu():
                 conn.close()
             except: pass
 
-    # =============================================================================
-    #  ÖZELLİK 2: MESAJ / DUYURU SUNUCUSU
-    # =============================================================================
 
     pencere = IzlemePencere()
     threading.Thread(target=broadcast_dongusu, daemon=True).start()
