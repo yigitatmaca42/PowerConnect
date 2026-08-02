@@ -5,7 +5,7 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Python](https://img.shields.io/badge/Python-3.x-blue.svg)](https://python.org)
 [![Pardus](https://img.shields.io/badge/Pardus-23%2B-red.svg)](https://pardus.org.tr)
-[![Release](https://img.shields.io/badge/Release-v1.0.5-green.svg)](https://github.com/yigitatmaca42/PowerConnect/releases/latest)
+[![Release](https://img.shields.io/badge/Release-v1.0.6-green.svg)](https://github.com/yigitatmaca42/PowerConnect/releases/latest)
 
 PowerConnect, öğretmenin ekranını öğrenci bilgisayarlarına gerçek zamanlı olarak yayınlamasını, dosya göndermesini ve öğrenci dosya sistemine erişmesini sağlayan hafif ve kurulumu kolay bir uygulamadır. Tamamen Pardus Linux üzerinde geliştirilmiş olup yerli ve milli ekosisteme katkı sağlamayı hedeflemektedir.
 
@@ -17,10 +17,10 @@ PowerConnect, öğretmenin ekranını öğrenci bilgisayarlarına gerçek zamanl
 
 ```bash
 # 1. Paketi indir
-wget https://github.com/yigitatmaca42/PowerConnect/releases/download/v1.0.5/powerconnect_1.0.5_amd64.deb
+wget https://github.com/yigitatmaca42/PowerConnect/releases/download/v1.0.6/powerconnect_1.0.6_amd64.deb
 
 # 2. Kur
-sudo dpkg -i powerconnect_1.0.5_amd64.deb
+sudo dpkg -i powerconnect_1.0.6_amd64.deb
 ```
 
 Kurulum tamamlandıktan sonra uygulamayı başlatmak için:
@@ -33,10 +33,10 @@ PowerConnect
 
 ```bash
 # 1. Paketi indir
-wget https://github.com/yigitatmaca42/PowerConnect/releases/download/v1.0.5/powerconnect-client_1.0.5_amd64.deb
+wget https://github.com/yigitatmaca42/PowerConnect/releases/download/v1.0.6/powerconnect-client_1.0.6_amd64.deb
 
 # 2. Kur
-sudo dpkg -i powerconnect-client_1.0.5_amd64.deb
+sudo dpkg -i powerconnect-client_1.0.6_amd64.deb
 sudo apt install -f -y
 ```
 
@@ -87,7 +87,7 @@ Tüm PC'lere aynı anda bağlanıldığında kartlar "Yayın aktif" durumuyla g�
 
 ### Ekran Modu
 
-Bağlanmadan önce ekran modunu seçebilirsiniz. Bağlantı kurulduktan sonra mod seçimi kilitlenir, tüm bağlantılar kesilene kadar değiştirilemez.
+Bağlanmadan önce sağ üstteki dropdown'dan ekran modunu seçebilirsiniz. Bağlantı kurulduktan sonra mod seçimi kilitlenir, tüm bağlantılar kesilene kadar değiştirilemez.
 
 - **Penceresiz** — Öğrenci ekranı tam ekran alınır, klavye/fare engellenir
 - **Pencereli** — Öğrenci alt+tab atabilir, ekranı küçültebilir ama kapatamaz
@@ -106,11 +106,11 @@ Arama çubuğuna yazdığınız ifadeyle listeyi daraltabilirsiniz. "Hepsine Ba�
 
 ### Öğrenci Ekranı İzleme ve Kontrolü
 
-Paneldeki herhangi bir PC kartındaki küçük önizlemeye tıklandığında öğrencinin ekranı büyük pencerede açılır ve kontrol moduna geçilir.
+Herhangi bir PC kartına sağ tıklayarak "Büyük Ekranda İzle + Kontrol Et" seçeneğine tıklanır. Aynı işlem PC kartındaki küçük önizlemeye tıklanarak da yapılabilir.
 
 ![Sağ tık menüsü](screenshots/resim_8.png)
 
-Bu pencerede fare hareketleri, tıklamalar, klavye girdileri ve kaydırma (scroll) gerçek zamanlı olarak öğrenci bilgisayarına iletilir. Öğrenci ekranı, yönetici penceresi küçültülse bile her zaman kendi monitörünün tam çözünürlüğünde görüntülenir.
+Öğrencinin ekranı büyük pencerede açılır ve kontrol moduna geçilir. Fare hareketleri, tıklamalar, klavye girdileri ve kaydırma (scroll) gerçek zamanlı olarak öğrenci bilgisayarına iletilir. Öğrenci ekranı, yönetici penceresi küçültülse bile her zaman kendi monitörünün tam çözünürlüğünde görüntülenir.
 
 ![Öğrenci ekranı izleme ve kontrol](screenshots/resim_9.png)
 
@@ -173,8 +173,8 @@ PowerConnect/
 │   ├── PowerConnect
 │   └── PowerConnect-Client
 ├── releases/             # Kurulum paketleri (.deb)
-│   ├── powerconnect_1.0.5_amd64.deb
-│   └── powerconnect-client_1.0.5_amd64.deb
+│   ├── powerconnect_1.0.6_amd64.deb
+│   └── powerconnect-client_1.0.6_amd64.deb
 ├── assets/               # Logo ve ikonlar
 │   ├── powerconnect.png       (626x626)
 │   └── powerconnect-small.png (32x32)
